@@ -1,0 +1,16 @@
+{
+  "name": "panasa",
+  "owner": {
+    "name": "Panasa"
+  },
+  "metadata": {
+    "description": "Panasa's shared Claude skills."
+  },
+  "plugins": [
+    {
+      "name": "panasa-docs",
+      "source": "./plugins/panasa-docs",
+      "description": "Panasa's standard project documents (Project Overview, SRS, Technical Design, Release and Handover) as branded Word files."
+    }
+  ]
+}

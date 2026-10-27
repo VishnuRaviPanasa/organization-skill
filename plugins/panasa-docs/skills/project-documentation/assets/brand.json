@@ -1,0 +1,10 @@
+{
+  "company": "Panasa",
+  "primary_color": "1F3864",
+  "accent_color": "2E75B6",
+  "light_color": "EAF0F8",
+  "font": "Calibri",
+  "heading_font": "Calibri",
+  "language": "en-IN",
+  "confidentiality_notice": "{classification}. Prepared by {company} for {client}. Do not share outside the project team without approval."
+}

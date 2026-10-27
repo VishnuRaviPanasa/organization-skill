@@ -1,0 +1,8 @@
+{
+  "name": "panasa-docs",
+  "description": "Panasa's standard project documents (Project Overview, SRS, Technical Design, Release and Handover) as branded Word files.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Panasa"
+  }
+}
