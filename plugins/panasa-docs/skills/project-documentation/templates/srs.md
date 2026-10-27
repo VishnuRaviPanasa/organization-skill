@@ -11,6 +11,7 @@ prepared_by: <Author name>
 reviewed_by: TBD
 approved_by: TBD
 classification: Confidential
+# Optional: client_logo: <logo file supplied by the client>   approval_ref: <where approval is recorded; only when Approved>
 revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 ---
 
@@ -18,7 +19,7 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 
 ## 1.1 Purpose
 
-This document specifies the requirements for <project name> for <client name>. It is the agreed basis for design, development, testing and acceptance.
+This document specifies the requirements for <project name> for <client name>.
 
 ## 1.2 Scope
 
@@ -70,7 +71,8 @@ This document specifies the requirements for <project name> for <client name>. I
 
 <!-- Group requirements by module: 3.1, 3.2 and so on. Each requirement gets a level-3 heading "FR-001: <short title>".
 IDs run through the whole document and are never reused or renumbered; a dropped requirement keeps its ID with "(Withdrawn)" after the title.
-Write "The system shall ...". One behaviour per requirement. Priority is Must, Should or Could. -->
+Write "The system shall ...". One behaviour per requirement. Priority is Must, Should or Could.
+Source names the exact input: document and section, meeting and date, or ticket. A rule, limit or behaviour that no source states is your proposal: mark it (Proposed) where it appears. -->
 
 ## 3.1 <Module name>
 
@@ -80,15 +82,16 @@ Write "The system shall ...". One behaviour per requirement. Priority is Must, S
 - **Description:** The system shall <behaviour>.
 - **Acceptance criteria:**
   1. Given <context>, when <action>, then <expected result>.
-- **Source:** <Workshop, ticket or person the requirement came from>
+- **Source:** <Exact source: document and section, meeting and date, or ticket>
 
 # 4. Non-functional requirements
 
-<!-- Each one measurable. Categories: Performance, Security, Availability, Scalability, Usability, Accessibility, Compatibility, Compliance, Maintainability. -->
+<!-- Each one measurable. Categories: Performance, Security, Availability, Scalability, Usability, Accessibility, Compatibility, Compliance, Maintainability.
+Targets come only from the client or a source document. If the client gave no number ("fast", "always available"), write TBD (owner: client) and add an open question; a suggested value may go in that question, marked (Proposed). -->
 
-| ID | Category | Requirement | Target or measure |
-|---|---|---|---|
-| NFR-001 | <Category> | <The system shall ...> | <e.g. 95% of API calls answered within 500 ms> |
+| ID | Category | Requirement | Target or measure | Source |
+|---|---|---|---|---|
+| NFR-001 | <Category> | <The system shall ...> | <e.g. 95% of API calls answered within 500 ms> | <Exact source> |
 
 # 5. External interfaces
 
@@ -112,7 +115,7 @@ Write "The system shall ...". One behaviour per requirement. Priority is Must, S
 
 # 6. Data requirements
 
-<!-- The main business data, not database tables. Mark personal data, because it drives security and compliance work. -->
+<!-- The main business data, not database tables. Mark personal data, because it drives security and compliance work: any data that identifies a person (names, phone numbers, email and postal addresses, locations, IDs, photos, signatures), including staff, drivers and doctors, is personal data. -->
 
 | Data | Description | Personal data | Retention |
 |---|---|---|---|
@@ -120,7 +123,7 @@ Write "The system shall ...". One behaviour per requirement. Priority is Must, S
 
 # 7. Out of scope
 
-<!-- Features someone might expect that this release will not deliver. -->
+<!-- Features someone might expect that this release will not deliver, as stated by a source. Items that simply weren't discussed belong in Open questions, not here. -->
 
 - <Item>
 
@@ -134,7 +137,7 @@ Write "The system shall ...". One behaviour per requirement. Priority is Must, S
 
 <!-- Leave Signature and Date empty; they are completed on paper or in an e-signature tool. -->
 
-By signing below, the parties agree that this document describes the requirements for <project name>.
+By signing below, the parties agree that this document describes the requirements for <project name>. Once signed, it is the agreed basis for design, development, testing and acceptance.
 
 | Name | Organisation | Role | Signature | Date |
 |---|---|---|---|---|

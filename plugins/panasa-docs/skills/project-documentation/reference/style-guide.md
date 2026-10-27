@@ -15,7 +15,14 @@
 - "shall" means mandatory, "should" means recommended, "may" means optional. Don't use "will" or "must" in requirements.
 - One behaviour per requirement. If a requirement needs "and", consider splitting it.
 - Every requirement has acceptance criteria a tester can check. Prefer "Given … when … then …".
-- Replace vague words (fast, user-friendly, secure, scalable) with a number or a standard: "loads in under 2 seconds on a 4G connection".
+- Replace vague words (fast, user-friendly, secure, scalable) with a number or a standard *that the client or a source gave*: "loads in under 2 seconds on a 4G connection". If none was given, write `TBD (owner: client)` and add an open question; a suggested value may go in the question, marked `(Proposed)`. Never invent the number.
+
+## Facts and proposals
+
+- Every statement comes from a source: a document, notes, a ticket, the code or the user. Source fields name the exact source.
+- Anything you add yourself (a rule, limit, step, design choice, reason, risk acceptance or exclusion) is marked `(Proposed)` where it appears, or listed under Assumptions. The reader must be able to tell agreed facts from suggestions.
+- Out of scope lists only exclusions a source states; items that weren't discussed are open questions.
+- When sources disagree, raise an open question citing both; don't choose silently.
 
 ## IDs
 
@@ -40,13 +47,14 @@ IDs have three digits and are never reused or renumbered, because other document
 
 ## Unknowns and gaps
 
-- Unknown facts: `TBD (owner: name or role)`. Never guess.
-- A section that doesn't apply stays in the document with one sentence explaining why.
+- Unknown facts: `TBD (owner: name or role)`, always with an owner. Never guess. Don't write "tbd", "TBC" or "to be confirmed"; the builder only tracks the full form.
+- A section that doesn't apply stays in the document as `Not applicable: <reason>`. Something not decided yet is a TBD, not "Not applicable".
 
 ## Confidentiality and security
 
 - Never include passwords, API keys, tokens, private keys, signing keystores or one-time codes. Say where they are kept and who grants access.
 - Personal data: only people's names, project roles and work email addresses. No personal phone numbers or identity numbers unless the client has agreed.
+- When describing data, anything that identifies a person (names, phone numbers, addresses, locations, IDs, photos, signatures) is personal data, including staff, drivers and doctors.
 - Hide real customer data in screenshots.
 - The classification is Confidential unless the front matter sets `classification:` to something else, such as Internal.
 

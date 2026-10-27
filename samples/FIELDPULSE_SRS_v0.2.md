@@ -19,7 +19,7 @@ revision: 0.2 | 27 Oct 2026 | Vishnu Ravi | Added offline requirements and NFRs 
 
 ## 1.1 Purpose
 
-This document specifies the requirements for FieldPulse for Acme Logistics. It is the agreed basis for design, development, testing and acceptance.
+This document specifies the requirements for FieldPulse for Acme Logistics.
 
 ## 1.2 Scope
 
@@ -106,11 +106,11 @@ FieldPulse replaces the paper delivery sheets drivers use today. It reads each d
 
 # 4. Non-functional requirements
 
-| ID | Category | Requirement | Target or measure |
-|---|---|---|---|
-| NFR-001 | Performance | The app shall open the route screen quickly on a mid-range phone. | Under 2 seconds on a 4G connection |
-| NFR-002 | Availability | The dispatcher dashboard shall be available during delivery hours. | 99.5% between 06:00 and 22:00 IST |
-| NFR-003 | Security | The system shall encrypt delivery data in transit and at rest. | TLS 1.2 or later in transit; AES-256 at rest |
+| ID | Category | Requirement | Target or measure | Source |
+|---|---|---|---|---|
+| NFR-001 | Performance | The app shall show the route screen within the target time after the driver opens it. | Under 2 seconds on a 4G connection for 95% of opens, on Acme's standard driver phone | Workshop 2, 24 Oct 2026 |
+| NFR-002 | Availability | The dispatcher dashboard shall be available during delivery hours. | 99.5% between 06:00 and 22:00 IST, measured monthly | Workshop 2, 24 Oct 2026 |
+| NFR-003 | Security | The system shall encrypt delivery data in transit and at rest. | TLS 1.2 or later in transit; AES-256 at rest | Acme IT security policy v3 |
 
 # 5. External interfaces
 
@@ -145,7 +145,7 @@ A delivery result sent to the ERP looks like this:
 
 | Data | Description | Personal data | Retention |
 |---|---|---|---|
-| Delivery record | Stop, time, status and driver | No | 7 years |
+| Delivery record | Stop address, time, status and driver | Yes (driver and delivery address) | 7 years |
 | Proof of delivery | Photo and signature | Yes | 7 years |
 | Driver location | GPS position during shifts | Yes | 90 days |
 
@@ -162,7 +162,7 @@ A delivery result sent to the ERP looks like this:
 
 # 9. Sign-off
 
-By signing below, the parties agree that this document describes the requirements for FieldPulse.
+By signing below, the parties agree that this document describes the requirements for FieldPulse. Once signed, it is the agreed basis for design, development, testing and acceptance.
 
 | Name | Organisation | Role | Signature | Date |
 |---|---|---|---|---|

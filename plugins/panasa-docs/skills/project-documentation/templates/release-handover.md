@@ -11,6 +11,7 @@ prepared_by: <Author name>
 reviewed_by: TBD
 approved_by: TBD
 classification: Confidential
+# Optional: client_logo: <logo file supplied by the client>   approval_ref: <where approval is recorded; only when Approved>
 revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 ---
 
@@ -19,7 +20,7 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 | Item | Detail |
 |---|---|
 | Release version | <e.g. 2.3.0> |
-| Release date | <DD Mon YYYY> |
+| Release date | <DD Mon YYYY> (<planned or actual>) |
 | Environment | <Production / Staging / UAT> |
 | Platforms | <e.g. Android, iOS, Web> |
 | Build or commit | <Build number or commit hash> |
@@ -65,11 +66,15 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 
 ## 4.2 Deployment steps
 
+<!-- Only steps from a runbook, ticket or the user, each saying who does it. Steps you suggest must be marked (Proposed); if nobody has given the steps, write TBD (owner: ...). -->
+
 1. <Step>
 
 ## 4.3 Rollback plan
 
-<!-- The exact steps to restore the previous version, and who decides to roll back. -->
+<!-- The exact steps to restore the previous version, and who decides to roll back, from the same kinds of source. For app-store releases, rollback means halting the staged rollout and shipping a fix; a store release can't be redeployed. -->
+
+
 
 1. <Step>
 
@@ -93,6 +98,8 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 
 # 6. Test summary
 
+<!-- Figures only from a test report the user provides; name the report below. Without a report, set the figures to TBD (owner: QA lead). -->
+
 | Test type | Executed | Passed | Failed | Notes |
 |---|---|---|---|---|
 | <e.g. Regression> | <Number> | <Number> | <Number> | |
@@ -101,7 +108,7 @@ Full test report: <File name or URL>
 
 # 7. Handover checklist
 
-<!-- Tick only what is actually done. Delete lines that don't apply and add anything the contract requires. -->
+<!-- Tick an item only when the user confirms it is done, and add how it was confirmed (e.g. "confirmed by client email, 30 Oct 2026"). Never tick on assumption. Delete lines that don't apply and add anything the contract requires. -->
 
 - [ ] Source code delivered and repository access transferred
 - [ ] Project Overview, SRS and Technical Design delivered at their latest versions

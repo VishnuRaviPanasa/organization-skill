@@ -11,6 +11,7 @@ prepared_by: <Author name>
 reviewed_by: TBD
 approved_by: TBD
 classification: Confidential
+# Optional: client_logo: <logo file supplied by the client>   approval_ref: <where approval is recorded; only when Approved>
 revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 ---
 
@@ -44,7 +45,7 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 
 ## 3.3 Out of scope
 
-<!-- Anything a reader might assume is included but isn't. This prevents disputes later. -->
+<!-- Anything a reader might assume is included but isn't, as agreed with the client or stated in a source. This prevents disputes later. Items that simply weren't discussed go to section 8 as open issues, not here. -->
 
 - <Item>
 
@@ -56,7 +57,7 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 
 # 5. Technology stack
 
-<!-- Only what the project actually uses. Delete rows that don't apply. -->
+<!-- Only what the project actually uses. Delete rows that don't apply. If the stack isn't decided yet, write TBD (owner: tech lead): "Not applicable" means it will never apply. -->
 
 | Layer | Technology | Version | Notes |
 |---|---|---|---|

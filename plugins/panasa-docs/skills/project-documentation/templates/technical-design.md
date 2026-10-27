@@ -11,6 +11,7 @@ prepared_by: <Author name>
 reviewed_by: TBD
 approved_by: TBD
 classification: Confidential
+# Optional: client_logo: <logo file supplied by the client>   approval_ref: <where approval is recorded; only when Approved>
 revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 ---
 
@@ -18,7 +19,9 @@ revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 
 ## 1.1 Purpose
 
-This document describes how <project name> is built. It implements the requirements in <SRS file name>.
+<!-- If this design was derived from existing code rather than agreed in advance, add a sentence such as: "Derived from the code at commit <hash> on <date>; anything not yet confirmed is marked (Proposed)." -->
+
+This document describes the design of <project name>. It implements the requirements in <SRS file name>.
 
 ## 1.2 Design goals
 
@@ -36,7 +39,7 @@ This document describes how <project name> is built. It implements the requireme
 
 ## 2.1 Architecture diagram
 
-<!-- A PNG showing the main components and how they communicate. If you can draw one (for example with Python and matplotlib, or Graphviz), embed it as below. Otherwise delete the image line, describe the components in 2.2, and write "TBD (owner: tech lead)" here. -->
+<!-- A PNG showing the main components and how they communicate. If you can draw one (for example with Python and matplotlib, or Graphviz), embed it as below; a diagram you draw yourself is a proposal, so end its caption with "(Proposed)" until the tech lead confirms it. Otherwise delete the image line, describe the components in 2.2, and write "TBD (owner: tech lead)" here. -->
 
 ![<What the diagram shows>](<path/to/diagram.png>)
 
@@ -95,7 +98,7 @@ This document describes how <project name> is built. It implements the requireme
 
 ## 6.4 Secrets management
 
-<!-- Where keys and passwords are kept and who can reach them. Never the values. -->
+<!-- Where keys and passwords are kept and who can reach them, as stated by a source. Never the values, and never claim they are stored safely without evidence: write TBD (owner: ...) instead. -->
 
 <Description>
 
@@ -119,11 +122,12 @@ This document describes how <project name> is built. It implements the requireme
 
 # 8. Key design decisions
 
-<!-- Decisions a newcomer would question. DEC IDs are never reused. -->
+<!-- Decisions a newcomer would question. DEC IDs are never reused.
+Record options and reasons only as a source states them. For a decision you can only see in the code, write the options and reason as TBD (owner: tech lead), or mark your suggestion (Proposed). Status is "Confirmed by <name>, <date>" or "Proposed". -->
 
-| ID | Decision | Options considered | Reason | Date |
-|---|---|---|---|---|
-| DEC-001 | <Decision> | <Options> | <Why this one> | <DD Mon YYYY> |
+| ID | Decision | Options considered | Reason | Status | Date |
+|---|---|---|---|---|---|
+| DEC-001 | <Decision> | <Options from a source> | <Reason from a source> | <Confirmed by name, or Proposed> | <DD Mon YYYY> |
 
 # 9. Testing approach
 

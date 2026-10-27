@@ -2,10 +2,11 @@
 """Build a Panasa-branded Word document from a project-documentation Markdown source.
 
 Usage:
-    python build_docx.py SOURCE.md [--out FOLDER_OR_FILE] [--check] [--blank]
+    python build_docx.py SOURCE.md [--out FOLDER_OR_FILE] [--check] [--blank] [--force]
 
     --check   validate only; nothing is written
     --blank   build a fill-in-by-hand template (placeholders and missing details allowed)
+    --force   overwrite an existing approved .docx (never needed for drafts)
 
 Exit code 0: valid (and built, unless --check); warnings may still be printed.
 Exit code 1: errors found; nothing is written.
@@ -21,7 +22,7 @@ from pathlib import Path
 
 try:
     from docx import Document
-    from docx.enum.text import WD_COLOR_INDEX
+    from docx.enum.text import WD_COLOR_INDEX, WD_TAB_ALIGNMENT
     from docx.opc.constants import RELATIONSHIP_TYPE as RT
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -52,9 +53,13 @@ COVER_FIELDS = (
     ("Prepared by", "prepared_by"),
     ("Reviewed by", "reviewed_by"),
     ("Approved by", "approved_by"),
+    ("Approval reference", "approval_ref"),
     ("Classification", "classification"),
 )
 IMAGE_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
+LOGO_TYPES = {".png", ".jpg", ".jpeg"}
+# Values that don't name a real person or record.
+NOT_A_NAME = {"pending", "tbc", "tba", "n/a", "na", "-", "none", "client", "panasa", "yes", "approved", "signed", "unknown"}
 STANDARD_IDS = ("FR", "NFR", "OQ", "DEC", "RSK", "KI")
 
 # Word can refuse files whose property elements are out of schema order, so new
@@ -99,19 +104,48 @@ INLINE = re.compile(
 )
 BR = re.compile(r"<br\s*/?>", re.I)
 TBD = re.compile(r"(\bTBD\b(?:\s*\([^)]*\))?)")
-PLACEHOLDER = re.compile(r"<(?!br\s*/?>)(?!https?:)[^<>\n]{1,80}>", re.I)
+PROPOSED = re.compile(r"(\(Proposed\b[^)]*\))")
+MARKERS = re.compile(r"(\bTBD\b(?:\s*\([^)]*\))?|\(Proposed\b[^)]*\))")
+TBD_OWNER = re.compile(r"\bTBD\s*\(owner:\s*([^)]*?[^)\s][^)]*)\)")
+TBD_PHRASE = re.compile(r"\b(?:tbd|Tbd)\b|(?i:\bto be (?:decided|confirmed|determined|defined|agreed)\b)")
+# A placeholder starts with a letter: "<500 ms" and "<ops@x.com>" are not placeholders.
+PLACEHOLDER = re.compile(r"<(?!br\b)[A-Za-z][^<>\n@]{0,78}>")
+OTHER_PLACEHOLDERS = [
+    (re.compile(r"\{\{[^{}\n]+\}\}"), "a template token {{...}}"),
+    (re.compile(r"\bX{3,}\b"), "an 'XXX' marker"),
+    (re.compile(r"\b(?:TODO|FIXME|TBC|TBA)\b"), "a TODO/TBC marker (use TBD (owner: ...))"),
+    (re.compile(r"(?i)\blorem ipsum\b"), "filler text (lorem ipsum)"),
+]
+BRACKET_PLACEHOLDER = re.compile(r"(?<!!)\[(?![ xX]\])([A-Z][a-z]+(?: [A-Za-z]+){0,4})\](?!\()")
+NOT_APPLICABLE = re.compile(r"(?i)^(?:n/?a|not applicable)\b\s*(.*)$")
+UNDECIDED = re.compile(r"(?i)\b(not (?:yet )?(?:been )?decided|yet to|will be|once |later|pending|at this stage|not (?:yet )?known)\b")
+VAGUE = re.compile(r"(?i)\b(fast|quick(?:ly)?|secure|user[- ]friendly|intuitive|easy|simple|robust|seamless|scalable|"
+                   r"efficient|flexible|modern|always available|as soon as possible)\b")
 DATE = re.compile(r"\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}")
 ID_DEF = re.compile(r"^((?:%s)-\d{3})\b" % "|".join(STANDARD_IDS))
+FR_HEADING = re.compile(r"^(FR-\d{3})\b")
 SECRETS = [
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "a private key"),
-    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "an AWS access key"),
+    (re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "an AWS access key"),
     (re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"), "a Google API key"),
-    (re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"), "a secret API key"),
+    (re.compile(r"\bGOCSPX-[A-Za-z0-9_-]{20,}"), "a Google OAuth client secret"),
+    # Real sk- keys mix digits and capitals; branch names like sk-offline-sync don't.
+    (re.compile(r"\bsk-(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{20,}"), "a secret API key"),
     (re.compile(r"\b[sr]k_(?:live|test)_[0-9A-Za-z]{16,}"), "a Stripe key"),
-    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}"), "a GitHub token"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})"), "a GitHub token"),
+    (re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}"), "a GitLab token"),
     (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"), "a Slack token"),
+    (re.compile(r"https://hooks\.slack\.com/services/[A-Za-z0-9/]+"), "a Slack webhook URL"),
+    (re.compile(r"\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}"), "a SendGrid key"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), "a JSON Web Token"),
+    (re.compile(r"(?i)\bAccountKey=[A-Za-z0-9+/=]{20,}"), "an Azure storage key"),
 ]
-SECRET_HINT = re.compile(r"(?i)\b(password|passwd|pwd|secret|api[ _-]?key|access[ _-]?token)\s*[:=]\s*\S+")
+URI_PASSWORD = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s:/@]+:([^\s@/]+)@", re.I)
+SECRET_ASSIGNMENT = re.compile(
+    r"(?i)(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret|account[_-]?key|private[_-]?key)"
+    r"[A-Za-z0-9_]*[\"']?\s*[:=]\s*[\"']?([^\s\"',;]+)")
+SAFE_VALUES = {"stored", "kept", "held", "in", "from", "via", "see", "none", "not", "set", "managed", "provided",
+               "required", "redacted", "password", "pass", "pwd", "secret", "xxx", "****"}
 
 
 # ---------------------------------------------------------------- parsing
@@ -284,7 +318,17 @@ def check_structure(blocks, expected, errors, warnings):
     return len(seen), len(want)
 
 
-def check_meta(meta, revisions, errors, warnings):
+def check_date(value, where, errors, warnings):
+    if not DATE.fullmatch(value):
+        warnings.append(f"{where}: dates should be written like 27 Oct 2026 (found '{value}').")
+        return
+    try:
+        datetime.strptime(value, "%d %b %Y")
+    except ValueError:
+        errors.append(f"{where}: '{value}' is not a real date.")
+
+
+def check_meta(meta, revisions, src_dir, errors, warnings):
     for key in REQUIRED:
         if not meta.get(key):
             errors.append(f"Front matter: '{key}' is missing.")
@@ -298,13 +342,18 @@ def check_meta(meta, revisions, errors, warnings):
         errors.append(f"version must look like 0.1 or 1.0 (found '{version}').")
     if status and status not in STATUSES:
         errors.append(f"status must be one of: {', '.join(STATUSES)} (found '{status}').")
-    if meta.get("date") and not DATE.fullmatch(meta["date"]):
-        warnings.append(f"date should be written like 27 Oct 2026 (found '{meta['date']}').")
-    if status == "Approved":
-        if re.fullmatch(r"\d+\.\d+", version) and int(version.split(".")[0]) < 1:
-            errors.append("An approved document must be version 1.0 or higher.")
-        if (meta.get("approved_by") or "TBD").upper().startswith("TBD"):
-            errors.append("An approved document needs the approver's name in approved_by.")
+    if meta.get("date"):
+        check_date(meta["date"], "Front matter date", errors, warnings)
+    if status == "Approved" and re.fullmatch(r"\d+\.\d+", version) and int(version.split(".")[0]) < 1:
+        errors.append("An approved document must be version 1.0 or higher.")
+    logo = meta.get("client_logo")
+    if logo:
+        path = Path(logo)
+        path = path if path.is_absolute() else src_dir / path
+        if not path.is_file():
+            errors.append(f"Front matter: client_logo file not found: {logo}")
+        elif path.suffix.lower() not in LOGO_TYPES:
+            errors.append("Front matter: client_logo must be a PNG or JPG file.")
     if not revisions:
         errors.append("Add at least one 'revision: version | date | author | changes' line to the front matter.")
     for fields, ln in revisions:
@@ -312,33 +361,98 @@ def check_meta(meta, revisions, errors, warnings):
             errors.append(f"Line {ln}: a revision line needs four parts: version | date | author | changes.")
         elif any(PLACEHOLDER.search(f) for f in fields):
             errors.append(f"Line {ln}: replace the placeholders in this revision line.")
+        else:
+            check_date(fields[1], f"Line {ln}", errors, warnings)
     if revisions and version and revisions[-1][0][0] != version:
         warnings.append(f"version is {version} but the last revision line is for {revisions[-1][0][0]}. "
                         f"Add a revision line for {version}.")
 
 
-def check_body(blocks, lines, first_line, src_dir, blank, errors, warnings, tbds):
-    placeholders, in_code = [], False
+def numbers(lines, limit=12):
+    return ", ".join(map(str, lines[:limit])) + (", ..." if len(lines) > limit else "")
+
+
+def real_secret(value):
+    """True when VALUE looks like an actual password or key, not a description, variable or example."""
+    v = value.strip().strip(".,;)")
+    if not v or v.lower() in SAFE_VALUES or v[0] in "<{$%*[(" or v.upper().startswith("TBD"):
+        return False
+    if len(v) < 6 or re.fullmatch(r"[\d.]+[a-z]{0,3}", v):
+        return False
+    mixed = re.search(r"[^A-Za-z0-9]", v) and re.search(r"[A-Z]", v) and re.search(r"[a-z]", v)
+    return bool(re.search(r"\d", v) or mixed)
+
+
+def check_secrets(raw_lines, errors):
+    """Scan every line of the source, including front matter, comments and code blocks."""
+    for ln, line in enumerate(raw_lines, 1):
+        found = [label for pattern, label in SECRETS if pattern.search(line)]
+        if any(real_secret(m.group(1)) for m in URI_PASSWORD.finditer(line)):
+            found.append("a URL with a password in it")
+        if any(real_secret(m.group(2)) for m in SECRET_ASSIGNMENT.finditer(line)):
+            found.append("a password or key value")
+        if found:
+            errors.append(f"Line {ln}: looks like {found[0]}. Remove it and say where it is stored instead, "
+                          "and tell the user it may need to be rotated.")
+
+
+def unowned_table_tbds(blocks):
+    """Line numbers of table rows with a bare TBD and no owner anywhere in the row.
+    A row is owned by an Owner column value or by a TBD (owner: ...) in another cell."""
+    found = []
+    for b in blocks:
+        if b["kind"] != "table" or not b["rows"]:
+            continue
+        header = [plain(c).strip().lower() for c in b["rows"][0]]
+        owner_col = next((k for k, h in enumerate(header) if "owner" in h), None)
+        for i, row in enumerate(b["rows"][1:], 1):
+            cells = [plain(c) for c in row]
+            bare = sum(len(re.findall(r"\bTBD\b", c)) - len(TBD_OWNER.findall(c)) for c in cells)
+            owner = cells[owner_col].strip() if owner_col is not None and owner_col < len(cells) else ""
+            if bare > 0 and not any(TBD_OWNER.search(c) for c in cells) and not (owner and "TBD" not in owner):
+                found.append(b["line"] + i + 1)  # header, separator, then rows
+    return found
+
+
+def check_body(blocks, lines, first_line, src_dir, blank, errors, warnings, tbds, proposed):
+    placeholders, no_owner, phrases, brackets, in_code = [], [], [], [], False
     for idx, line in enumerate(lines):
         ln = first_line + idx
         if line.strip().startswith("```"):
             in_code = not in_code
             continue
-        for pattern, label in SECRETS:
-            if pattern.search(line):
-                errors.append(f"Line {ln}: looks like {label}. Remove it and say where it is stored instead.")
         if in_code:
             continue
-        if SECRET_HINT.search(line):
-            warnings.append(f"Line {ln}: may contain a password or key. If it does, remove it and say where it is stored.")
-        if PLACEHOLDER.search(line):
-            placeholders.append(ln)
-        if TBD.search(line):
+        text = re.sub(r"`[^`]*`", "", line)  # inline code is literal, never a placeholder or marker
+        if TBD.search(text):
             tbds.append((ln, line.strip()))
-    if placeholders and not blank:
-        shown = ", ".join(map(str, placeholders[:12])) + (", ..." if len(placeholders) > 12 else "")
-        errors.append(f"{len(placeholders)} line(s) still contain <placeholders> (lines {shown}). "
+        if PROPOSED.search(text):
+            proposed.append((ln, line.strip()))
+        if blank:
+            continue
+        if PLACEHOLDER.search(text):
+            placeholders.append(ln)
+        for pattern, label in OTHER_PLACEHOLDERS:
+            if pattern.search(text):
+                errors.append(f"Line {ln}: contains {label}. Replace it with real content or TBD (owner: ...).")
+        if not line.lstrip().startswith("|") and len(re.findall(r"\bTBD\b", text)) > len(TBD_OWNER.findall(text)):
+            no_owner.append(ln)
+        if TBD_PHRASE.search(text):
+            phrases.append(ln)
+        if BRACKET_PLACEHOLDER.search(text) and not CHECK.match(line):
+            brackets.append(ln)
+    if not blank:
+        no_owner = sorted(no_owner + unowned_table_tbds(blocks))
+    if placeholders:
+        errors.append(f"{len(placeholders)} line(s) still contain <placeholders> (lines {numbers(placeholders)}). "
                       "Replace them with real content or TBD (owner: ...).")
+    if no_owner:
+        errors.append(f"TBD without an owner on line(s) {numbers(no_owner)}. Write TBD (owner: name or role).")
+    if phrases:
+        errors.append(f"Line(s) {numbers(phrases)} say 'tbd' or 'to be decided/confirmed'. "
+                      "Write TBD (owner: name or role) so the gap is tracked.")
+    if brackets:
+        warnings.append(f"Line(s) {numbers(brackets)} contain [Bracketed text] that may be a placeholder.")
 
     ids = {}
     for b in blocks:
@@ -367,7 +481,158 @@ def check_body(blocks, lines, first_line, src_dir, blank, errors, warnings, tbds
                 errors.append(f"Line {b['line']}: {path.suffix} images aren't supported; use PNG or JPG.")
 
 
-def report(src, meta, sections, errors, warnings, tbds, blank):
+def section_body(blocks, i):
+    """Blocks under the heading at index I, up to the next heading of the same or a higher level."""
+    level, out = blocks[i]["level"], []
+    for b in blocks[i + 1:]:
+        if b["kind"] == "heading" and b["level"] <= level:
+            break
+        out.append(b)
+    return out
+
+
+def check_content(blocks, doc_type, errors, warnings):
+    for i, b in enumerate(blocks):
+        if b["kind"] == "heading" and not any(x["kind"] not in ("heading", "pagebreak") for x in section_body(blocks, i)):
+            errors.append(f"Line {b['line']}: '{plain(b['text'])}' has no content. Add content, TBD (owner: ...) or "
+                          "'Not applicable: <reason>', or remove the sub-section if it is optional.")
+        if b["kind"] in ("para", "bullet"):
+            m = NOT_APPLICABLE.match(plain(b["text"]).strip())
+            if m:
+                reason = m.group(1).lstrip(":.-– ").strip()
+                if len(reason.split()) < 3:
+                    errors.append(f"Line {b['line']}: write 'Not applicable: <reason>' with a real reason.")
+                elif UNDECIDED.search(reason):
+                    warnings.append(f"Line {b['line']}: this sounds undecided rather than not applicable. "
+                                    "Use TBD (owner: ...) for things that haven't been decided yet.")
+    if doc_type == "SRS":
+        check_requirements(blocks, errors, warnings)
+
+
+def check_requirements(blocks, errors, warnings):
+    vague = ("uses vague wording ('{}'). Give a measurable target from a source, or TBD (owner: ...) "
+             "with an open question proposing a value.")
+    for i, b in enumerate(blocks):
+        if b["kind"] != "heading" or b["level"] != 3:
+            continue
+        m = FR_HEADING.match(plain(b["text"]).strip())
+        if not m or "withdrawn" in b["text"].lower():
+            continue
+        body = section_body(blocks, i)
+        fields = {}
+        for j, x in enumerate(body):
+            if x["kind"] == "bullet" and x["level"] == 0:
+                key, _, rest = plain(x["text"]).strip().partition(":")
+                fields[key.strip().lower()] = (rest.strip(), j)
+        missing = []
+        if not re.match(r"(Must|Should|Could)\b", fields.get("priority", ("",))[0]):
+            missing.append("a Priority of Must, Should or Could")
+        description = fields.get("description", ("",))[0]
+        if "shall" not in description.lower():
+            missing.append("a Description using 'shall'")
+        criteria = fields.get("acceptance criteria")
+        nested = criteria and any(y["kind"] in ("number", "bullet") and y.get("level", 0) >= 1
+                                  for y in body[criteria[1] + 1:criteria[1] + 2])
+        if not criteria or not (criteria[0] or nested):
+            missing.append("acceptance criteria")
+        if not fields.get("source", ("",))[0]:
+            missing.append("a Source")
+        if missing:
+            errors.append(f"Line {b['line']}: {m.group(1)} needs {', '.join(missing)}.")
+        word = VAGUE.search(description)
+        if word:
+            warnings.append(f"Line {b['line']}: {m.group(1)} " + vague.format(word.group(1)))
+    for b in blocks:
+        if b["kind"] != "table" or not b["rows"]:
+            continue
+        header = [plain(c).strip().lower() for c in b["rows"][0]]
+        target = header.index("target or measure") if "target or measure" in header else None
+        for row in b["rows"][1:]:
+            rid = plain(row[0]).strip() if row else ""
+            if not re.match(r"NFR-\d{3}$", rid):
+                continue
+            word = VAGUE.search(plain(" ".join(row[1:])))
+            if word:
+                warnings.append(f"Line {b['line']}: {rid} " + vague.format(word.group(1)))
+            value = plain(row[target]) if target is not None and target < len(row) else ""
+            unmeasured = not re.search(r"\d", value) and (VAGUE.search(value) or len(value.split()) < 4)
+            if target is not None and unmeasured and "TBD" not in value and "(Proposed" not in value:
+                warnings.append(f"Line {b['line']}: {rid} has no measurable target. Use a number or named standard "
+                                "from a source, or TBD (owner: ...).")
+
+
+def named(value):
+    v = (value or "").strip()
+    return bool(v) and not v.upper().startswith("TBD") and v.lower() not in NOT_A_NAME and not PLACEHOLDER.search(v)
+
+
+def open_questions(blocks):
+    found = []
+    for b in blocks:
+        if b["kind"] != "table" or not b["rows"]:
+            continue
+        header = [plain(c).strip().lower() for c in b["rows"][0]]
+        if "status" not in header:
+            continue
+        k = header.index("status")
+        for row in b["rows"][1:]:
+            rid = plain(row[0]).strip() if row else ""
+            if re.match(r"OQ-\d{3}$", rid) and k < len(row) and plain(row[k]).strip().lower() == "open":
+                found.append(rid)
+    return found
+
+
+def check_approval(meta, blocks, tbds, proposed, errors, warnings):
+    status = meta.get("status")
+    if status == "Approved":
+        if not named(meta.get("reviewed_by")):
+            errors.append(f"An approved document needs the reviewer's name in reviewed_by (found '{meta.get('reviewed_by', '')}').")
+        if not named(meta.get("approved_by")):
+            errors.append(f"An approved document needs the approver's name in approved_by (found '{meta.get('approved_by', '')}').")
+        if not named(meta.get("approval_ref")):
+            errors.append("An approved document needs approval_ref: where the approval is recorded "
+                          "(e-signature ID, signed copy, or email and date).")
+        if tbds:
+            errors.append(f"An approved document can't contain open TBDs ({len(tbds)} found).")
+        if proposed:
+            errors.append(f"An approved document can't contain Proposed items ({len(proposed)} found). "
+                          "Confirm or remove each one first.")
+        questions = open_questions(blocks)
+        if questions:
+            errors.append(f"An approved document can't have open questions: {', '.join(questions)}.")
+    else:
+        if named(meta.get("approved_by")):
+            warnings.append(f"approved_by names '{meta['approved_by']}' but the status is {status}. On a new version, "
+                            "set approved_by back to TBD until that version is approved.")
+        if meta.get("approval_ref"):
+            warnings.append("approval_ref is set but the document isn't approved; it belongs to an earlier version.")
+
+
+def check_rhn(blocks, errors):
+    section, figures, report_named = "", False, False
+    for b in blocks:
+        if b["kind"] == "heading" and b["level"] == 1:
+            section = plain(b["text"]).lower()
+            continue
+        if not section.startswith("6."):
+            continue
+        if b["kind"] == "table" and b["rows"]:
+            header = [plain(c).strip().lower() for c in b["rows"][0]]
+            columns = [k for k, h in enumerate(header) if h in ("executed", "passed", "failed")]
+            figures |= any(k < len(row) and re.search(r"\d", row[k]) for row in b["rows"][1:] for k in columns)
+        elif b["kind"] in ("para", "bullet") and "report" in b["text"].lower():
+            evidence = b["text"].split(":", 1)[-1].strip()
+            report_named |= bool(evidence) and "TBD" not in evidence and not PLACEHOLDER.search(evidence)
+    if figures and not report_named:
+        errors.append("Test summary: test figures need a named test report (file name or link). "
+                      "If there is no report, set the figures to TBD (owner: ...).")
+
+
+def short(text, n=110):
+    return text if len(text) <= n else text[: n - 3] + "..."
+
+
+def report(src, meta, sections, errors, warnings, tbds, proposed, ticks, blank):
     print(f"{src.name}: {meta.get('type') or '?'} v{meta.get('version', '?')}, {meta.get('status', '?')}")
     if sections:
         print(f"  Structure: {sections[0]} of {sections[1]} standard sections present")
@@ -378,12 +643,37 @@ def report(src, meta, sections, errors, warnings, tbds, blank):
     if blank:
         return
     if tbds:
-        print(f"  {len(tbds)} TBD item(s); tell the user about each one and its owner:")
+        print(f"  {len(tbds)} TBD item(s):")
         for ln, text in tbds:
-            print(f"    line {ln}: {text if len(text) <= 110 else text[:107] + '...'}")
-    unnamed = [k for k in ("reviewed_by", "approved_by") if (meta.get(k) or "TBD").upper().startswith("TBD")]
-    if unnamed:
-        print(f"  Not named yet: {', '.join(unnamed)}")
+            print(f"    line {ln}: {short(text)}")
+    if proposed:
+        print(f"  {len(proposed)} Proposed item(s), which the user must confirm or reject:")
+        for ln, text in proposed:
+            print(f"    line {ln}: {short(text)}")
+    if ticks:
+        print(f"  {len(ticks)} ticked checklist item(s); ticks need evidence from the user:")
+        for ln, text in ticks:
+            print(f"    line {ln}: {short(text)}")
+
+
+def handover(meta, out, tbds, proposed, questions, ticks):
+    owners = {}
+    for _, text in tbds:
+        for owner in TBD_OWNER.findall(text):
+            owners[owner.strip()] = owners.get(owner.strip(), 0) + 1
+    print("HAND-OVER: your final message to the user must cover all of the following:")
+    print(f"  - The file: {out.name} ({meta['type']} v{meta['version']}, {meta['status']})")
+    if owners:
+        print("  - Open TBD items by owner: " + "; ".join(f"{o} ({n})" for o, n in owners.items()))
+    else:
+        print("  - No open TBD items.")
+    if proposed:
+        print(f"  - {len(proposed)} Proposed item(s), highlighted in turquoise, that the user must confirm or reject")
+    if questions:
+        print(f"  - Open questions: {', '.join(questions)}")
+    if ticks:
+        print(f"  - {len(ticks)} ticked checklist item(s): ask the user to confirm the evidence for each")
+    print("  - Word asks to update fields when the file is first opened; answering Yes fills in the table of contents.")
 
 
 # ---------------------------------------------------------------- Word helpers
@@ -439,7 +729,7 @@ def add_text(par, text, bold=False, italic=False, mono=False):
     for k, chunk in enumerate(BR.split(text)):
         if k:
             par.add_run().add_break()
-        for piece in TBD.split(chunk):
+        for piece in MARKERS.split(chunk):
             if not piece:
                 continue
             run = par.add_run(piece)
@@ -451,6 +741,8 @@ def add_text(par, text, bold=False, italic=False, mono=False):
                 run.font.name = "Consolas"
             if TBD.fullmatch(piece):
                 run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            elif PROPOSED.fullmatch(piece):
+                run.font.highlight_color = WD_COLOR_INDEX.TURQUOISE
 
 
 def add_link(ctx, par, text, url):
@@ -634,10 +926,20 @@ def add_cover(ctx, meta):
         p.add_run().add_picture(str(logo), height=Cm(1.6))
     else:
         p.add_run(brand["company"].upper())
+    if meta.get("client_logo"):
+        # Client logo on the right of the same line; marked so docx_to_md.py can recover it.
+        path = Path(meta["client_logo"])
+        path = path if path.is_absolute() else ctx.src_dir / path
+        p.paragraph_format.tab_stops.add_tab_stop(ctx.text_width, WD_TAB_ALIGNMENT.RIGHT)
+        p.add_run("\t")
+        pic = p.add_run().add_picture(str(path), height=Cm(1.6))
+        if pic.width > Cm(6):
+            pic.width, pic.height = Cm(6), Emu(int(pic.height * Cm(6) / pic.width))
+        pic._inline.docPr.set("descr", "client-logo")
     ctx.par("Title", meta["title"])
     ctx.par("Subtitle", meta["project"])
-    add_table(ctx, [[label, meta.get(key, "")] for label, key in COVER_FIELDS],
-              header=False, weights=[1, 2.6], label_col=True)
+    rows = [[label, meta.get(key, "")] for label, key in COVER_FIELDS if key != "approval_ref" or meta.get(key)]
+    add_table(ctx, rows, header=False, weights=[1, 2.6], label_col=True)
     notice = brand["confidentiality_notice"]
     for token, value in (("{classification}", meta["classification"]), ("{company}", brand["company"]),
                          ("{client}", meta["client"])):
@@ -716,6 +1018,7 @@ def main():
     ap.add_argument("--out", help="output folder or .docx file (default: next to the source)")
     ap.add_argument("--check", action="store_true", help="validate only; write nothing")
     ap.add_argument("--blank", action="store_true", help="build a fill-in-by-hand template")
+    ap.add_argument("--force", action="store_true", help="overwrite an existing approved .docx")
     args = ap.parse_args()
 
     src = Path(args.source).resolve()
@@ -727,15 +1030,22 @@ def main():
     meta["type"] = meta.get("type", "").upper()
     clean_lines = strip_comments("\n".join(body_lines)).split("\n")
     blocks = parse_blocks(clean_lines, first_line)
-    warnings, tbds, sections = [], [], None
+    warnings, tbds, proposed, sections = [], [], [], None
+    check_secrets(text.split("\n"), errors)
     if meta["type"] not in DOC_TYPES:
         errors.append(f"type must be one of {', '.join(DOC_TYPES)} (found '{meta['type']}').")
     else:
         sections = check_structure(blocks, expected_sections(meta["type"]), errors, warnings)
         if not args.blank:
-            check_meta(meta, revisions, errors, warnings)
-        check_body(blocks, clean_lines, first_line, src.parent, args.blank, errors, warnings, tbds)
-    report(src, meta, sections, errors, warnings, tbds, args.blank)
+            check_meta(meta, revisions, src.parent, errors, warnings)
+        check_body(blocks, clean_lines, first_line, src.parent, args.blank, errors, warnings, tbds, proposed)
+        if not args.blank:
+            check_content(blocks, meta["type"], errors, warnings)
+            if meta["type"] == "RHN":
+                check_rhn(blocks, errors)
+            check_approval(meta, blocks, tbds, proposed, errors, warnings)
+    ticks = [(b["line"], plain(b["text"])) for b in blocks if b["kind"] == "check" and b["done"]]
+    report(src, meta, sections, errors, warnings, tbds, proposed, ticks, args.blank)
     if errors:
         print("Not built: fix the errors above and run again.")
         return 1
@@ -751,6 +1061,15 @@ def main():
     out = Path(args.out).resolve() if args.out else src.parent
     if out.suffix.lower() != ".docx":
         out = out / name
+    if out.exists() and not args.force:
+        try:
+            previous = Document(str(out)).core_properties.content_status
+        except Exception:
+            previous = ""
+        if previous == "Approved":
+            print(f"ERROR: {out.name} is an approved document and is never overwritten. Raise the version for "
+                  "any change, or use --force only if this file was never issued.")
+            return 1
     try:
         build(meta, revisions, blocks, brand, src.parent, out, args.blank)
     except PermissionError:
@@ -758,8 +1077,7 @@ def main():
         return 1
     print(f"Built: {out}")
     if not args.blank:
-        print("Tell the user: Word asks to update fields when the file is first opened; "
-              "answering Yes fills in the table of contents.")
+        handover(meta, out, tbds, proposed, open_questions(blocks), ticks)
     return 0
 
 

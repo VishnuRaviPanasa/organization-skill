@@ -15,6 +15,10 @@ Panasa's shared Claude skills. This repo is the single source for them: the Clau
 
 Claude picks the skill up whenever someone asks for project documentation, for example "Write an SRS for the Nirvana loans module from these workshop notes" or "Update the FieldPulse handover note for release 2.4". In Claude Code you can also run `/panasa-docs:project-documentation`.
 
+Every project gets its own details (name, code, client, version, author) on the cover, in the header and in the file name. Panasa's branding is the same everywhere. To put the client's logo on the cover as well, give Claude the logo file (PNG or JPG) and ask for it on the cover.
+
+In the Word file, open items are highlighted: `TBD (owner: ...)` in yellow, and anything Claude suggested that no source states, marked `(Proposed)`, in turquoise. Both must be resolved before a document can be marked Approved.
+
 `samples/` has a finished example: [FIELDPULSE_SRS_v0.2.md](samples/FIELDPULSE_SRS_v0.2.md) and the Word file built from it. The project and client are fictional.
 
 ## Layout
@@ -45,7 +49,9 @@ samples/                               worked example
    - branding: `assets/brand.json`, plus the logo as `assets/logo.png` (PNG with a transparent background, about 600 px wide). Then run `python tools/make_template.py`.
 2. Run `python tools/package_skill.py`. It checks the skill, test-builds every template and writes `dist/project-documentation.zip`.
 3. Raise `version` in `plugins/panasa-docs/.claude-plugin/plugin.json`, then open a pull request.
-4. After merging, an Owner uploads the new ZIP to the Claude app (see below). Claude Code users get the update automatically.
+4. After merging, an Owner uploads the new ZIP to the Claude app (see below), which replaces the old version for everyone. If the console won't accept a skill with the same name, remove the old one first. Claude Code users get the update automatically because the version number went up.
+
+Documents already produced aren't affected by an update. Each .docx records "Built with the Panasa project-documentation skill" in its properties.
 
 Renaming, reordering or adding a top-level section changes the standard for everyone, and the builder rejects documents that don't match it. Agree such changes before merging.
 
@@ -64,14 +70,14 @@ Every member gets the skill, switched on by default. To release an update, uploa
 
 ### Claude Code
 
-1. Push this repo to Panasa's Git host. Every developer needs read access to it.
-2. An Owner adds this to claude.ai → Organization settings → Claude Code → Managed settings. Replace `your-org` with the real organisation:
+1. The repo is `github.com/VishnuRaviPanasa/organization-skill` (private). Every developer needs read access to it and must be able to clone it on their machine (signed in to GitHub through git), plus Python 3 with `pip install python-docx` (the Claude app runs the scripts in its own environment).
+2. An Owner adds this to claude.ai → Organization settings → Claude Code → Managed settings:
 
    ```json
    {
      "extraKnownMarketplaces": {
        "panasa": {
-         "source": { "source": "github", "repo": "your-org/panasa-claude-skills" },
+         "source": { "source": "github", "repo": "VishnuRaviPanasa/organization-skill" },
          "autoUpdate": true
        }
      },
