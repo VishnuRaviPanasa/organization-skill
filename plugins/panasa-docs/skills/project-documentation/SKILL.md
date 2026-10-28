@@ -41,7 +41,7 @@ These documents become contracts, runbooks and audit records, so every statement
 
 1. **Pick the type** from the table. Ask only if the request really fits two types.
 2. **Gather facts** from everything available: files and notes the user shared, tickets, earlier documents and, in a code repository, the code itself (build files, configuration without secrets, CI pipelines, README, API routes, database migrations). If related Panasa documents exist for the project (an SRS for a TDD, earlier versions), read them and keep IDs, names and decisions consistent. Look only in the project folder and places the user names; don't search parent folders or other projects.
-3. **Ask once for essentials** you could not find: project name and code, client, author, and facts that whole sections depend on. Ask in one message. If the user can't answer, continue with TBDs; don't invent.
+3. **Ask once for essentials** you could not find: project name and code, client, author, and facts that whole sections depend on. In the same message, ask whether they want logos on the cover: their company's logo and the client's, as PNG or JPG files they upload (see Logos). Ask in one message. If the user can't answer, continue with TBDs; don't invent.
 4. **Read** `reference/style-guide.md` and the template for the type.
 5. **Write the source file.** Copy the template to `<PROJECTCODE>_<TYPE>_v<version>.md` (for example `NIRVANA_SRS_v0.1.md`) and fill it in:
    - Keep every top-level (`#`) section, with its number and title unchanged, in the template's order. Extra material goes in a `##` sub-section or at the end as `# Appendix A: <title>`.
@@ -69,9 +69,16 @@ These documents become contracts, runbooks and audit records, so every statement
 - Fill test figures only from a test report the user provides, and name the report. Tick a checklist item only when the user confirms it is done; never tick on assumption.
 - Say whether the release date is planned or actual.
 
-## Client logo
+## Logos
 
-If the user provides the client's logo (PNG or JPG) and wants it on the cover, save it next to the source and add `client_logo: <file name>` to the front matter. Use only a logo file the user has supplied; never download one.
+The template has no fixed logo; each document uses the logos the user supplies.
+
+- **Ask** on every new document, unless the user has already said: "Do you want logos on the cover? You can upload your company's logo and the client's logo (PNG or JPG), or skip this." If you're asking other questions first (step 3), include it there. Otherwise ask in your final message after the first build; the builder's hand-over reminds you. If they send logos, add them and rebuild.
+- **Company logo:** save the file next to the source and add `logo: <file name>`. It appears on the cover and in the page header instead of the company name.
+- **Client logo:** add `client_logo: <file name>`. It appears on the right of the cover.
+- **No logo:** if the user declines, add `logo: none` so they aren't asked again; the cover and header show the company name.
+- **Use only files the user uploads or points to.** Never download a logo or take one from a website.
+- **When updating a document**, the converter keeps its logos; don't ask again unless the user wants to change them.
 
 ## Blank templates
 
@@ -81,7 +88,7 @@ If someone wants a blank template to fill in by hand in Word, build the template
 
 The builder understands this Markdown and nothing more:
 
-- Front matter between `---` lines: `key: value` lines, plus one `revision: version | date | author | changes` line per version, oldest first. Optional keys: `title`, `classification`, `client_logo`, `approval_ref`, `project_code_status` (`agreed` or `provisional`).
+- Front matter between `---` lines: `key: value` lines, plus one `revision: version | date | author | changes` line per version, oldest first. Optional keys: `title`, `classification`, `logo`, `client_logo`, `approval_ref`, `project_code_status` (`agreed` or `provisional`).
 - Headings `#` to `####`.
 - Paragraphs with `**bold**`, `*italic*`, `` `code` `` and `[link text](https://...)`.
 - Bullets (`- `) and numbered items (`1. `), nested by indenting two spaces; checklists `- [ ]` and `- [x]`.

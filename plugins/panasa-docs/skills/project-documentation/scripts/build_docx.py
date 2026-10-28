@@ -357,14 +357,15 @@ def check_meta(meta, revisions, src_dir, errors, warnings):
         check_date(meta["date"], "Front matter date", errors, warnings)
     if status == "Approved" and re.fullmatch(r"\d+\.\d+", version) and int(version.split(".")[0]) < 1:
         errors.append("An approved document must be version 1.0 or higher.")
-    logo = meta.get("client_logo")
-    if logo:
-        path = Path(logo)
-        path = path if path.is_absolute() else src_dir / path
-        if not path.is_file():
-            errors.append(f"Front matter: client_logo file not found: {logo}")
-        elif path.suffix.lower() not in LOGO_TYPES:
-            errors.append("Front matter: client_logo must be a PNG or JPG file.")
+    for key in ("logo", "client_logo"):
+        logo = meta.get(key)
+        if logo and logo.lower() != "none":  # "none" records that the user chose no logo
+            path = Path(logo)
+            path = path if path.is_absolute() else src_dir / path
+            if not path.is_file():
+                errors.append(f"Front matter: {key} file not found: {logo}")
+            elif path.suffix.lower() not in LOGO_TYPES:
+                errors.append(f"Front matter: {key} must be a PNG or JPG file.")
     if not revisions:
         errors.append("Add at least one 'revision: version | date | author | changes' line to the front matter.")
     for fields, ln in revisions:
@@ -684,7 +685,7 @@ def secret_files_near(src):
     return found
 
 
-def handover(meta, out, tbds, proposed, questions, ticks, secret_files):
+def handover(meta, out, tbds, proposed, questions, ticks, secret_files, first_version):
     owners = {}
     for _, text in tbds:
         for owner in TBD_OWNER.findall(text):
@@ -693,6 +694,9 @@ def handover(meta, out, tbds, proposed, questions, ticks, secret_files):
     print(f"  - The file: {out.name} ({meta['type']} v{meta['version']}, {meta['status']})")
     if meta.get("project_code_status", "").lower() == "provisional":
         print(f"  - The project code {meta['project_code']} is provisional: it must be agreed before approval")
+    if first_version and "logo" not in meta and "client_logo" not in meta:
+        print("  - No logos yet: ask the user whether they want their company logo and/or the client's logo on the cover "
+              "(PNG or JPG they upload). If they send them, add logo: / client_logo: and rebuild; if not, set logo: none.")
     if secret_files:
         print("  - Files that usually hold secrets are in the project folder (" + ", ".join(secret_files) + "). "
               "Tell the user they should not be shared or committed and may need rotating; do not open them.")
@@ -951,24 +955,45 @@ def fill_tokens(doc, tokens):
                             run.text = run.text.replace(key, value)
 
 
+def logo_path(ctx, meta, key):
+    """The logo file named in the front matter (supplied by the user for this document), or None."""
+    if not meta.get(key) or meta[key].lower() == "none":
+        return None
+    path = Path(meta[key])
+    return path if path.is_absolute() else ctx.src_dir / path
+
+
+def add_logo(run, path, height, max_width, marker):
+    pic = run.add_picture(str(path), height=height)
+    if pic.width > max_width:
+        pic.width, pic.height = max_width, Emu(int(pic.height * max_width / pic.width))
+    pic._inline.docPr.set("descr", marker)  # lets docx_to_md.py recover the logo for the next version
+
+
+def set_header_logo(doc, path, company):
+    """Replace the company name in the page header with the logo the user supplied."""
+    for sec in doc.sections:
+        for p in sec.header.paragraphs:
+            for run in p.runs:
+                if run.text.strip() == company.upper():
+                    run.text = ""
+                    add_logo(run, path, Cm(0.8), Cm(4), "brand-logo")
+                    return
+
+
 def add_cover(ctx, meta):
     brand = ctx.brand
     p = ctx.par("Cover Brand")
-    logo = ASSETS / "logo.png"
-    if logo.is_file():
-        p.add_run().add_picture(str(logo), height=Cm(1.6))
+    logo = logo_path(ctx, meta, "logo") or (ASSETS / "logo.png" if (ASSETS / "logo.png").is_file() else None)
+    if logo:
+        add_logo(p.add_run(), logo, Cm(1.6), Cm(6), "brand-logo")
     else:
         p.add_run(brand["company"].upper())
-    if meta.get("client_logo"):
-        # Client logo on the right of the same line; marked so docx_to_md.py can recover it.
-        path = Path(meta["client_logo"])
-        path = path if path.is_absolute() else ctx.src_dir / path
+    client_logo = logo_path(ctx, meta, "client_logo")
+    if client_logo:  # on the right of the same line
         p.paragraph_format.tab_stops.add_tab_stop(ctx.text_width, WD_TAB_ALIGNMENT.RIGHT)
         p.add_run("\t")
-        pic = p.add_run().add_picture(str(path), height=Cm(1.6))
-        if pic.width > Cm(6):
-            pic.width, pic.height = Cm(6), Emu(int(pic.height * Cm(6) / pic.width))
-        pic._inline.docPr.set("descr", "client-logo")
+        add_logo(p.add_run(), client_logo, Cm(1.6), Cm(6), "client-logo")
     ctx.par("Title", meta["title"])
     ctx.par("Subtitle", meta["project"])
     shown = dict(meta)
@@ -1026,6 +1051,8 @@ def build(meta, revisions, blocks, brand, src_dir, out_path, blank):
         provisional = " (provisional code)" if meta.get("project_code_status", "").lower() == "provisional" else ""
         doc_ref = f"{meta['project_code']}{provisional} · {meta['type']} · v{meta['version']} · {meta['status']}"
     fill_tokens(doc, {"{{DOC_REF}}": doc_ref, "{{CLASSIFICATION}}": meta["classification"]})
+    if logo_path(ctx, meta, "logo"):
+        set_header_logo(doc, logo_path(ctx, meta, "logo"), brand["company"])
 
     add_cover(ctx, meta)
     add_revisions(ctx, revisions)
@@ -1116,7 +1143,7 @@ def main():
         return 1
     print(f"Built: {out}")
     if not args.blank:
-        handover(meta, out, tbds, proposed, open_questions(blocks), ticks, secret_files_near(src))
+        handover(meta, out, tbds, proposed, open_questions(blocks), ticks, secret_files_near(src), len(revisions) <= 1)
     return 0
 
 

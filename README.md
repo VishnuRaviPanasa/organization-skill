@@ -15,7 +15,7 @@ Panasa's shared Claude skills. This repo is the single source for them: the Clau
 
 Claude picks the skill up whenever someone asks for project documentation, for example "Write an SRS for the Nirvana loans module from these workshop notes" or "Update the FieldPulse handover note for release 2.4". In Claude Code you can also run `/panasa-docs:project-documentation`.
 
-Every project gets its own details (name, code, client, version, author) on the cover, in the header and in the file name. Panasa's branding is the same everywhere. If the client hasn't agreed a project code yet, Claude uses a provisional one: the cover says so, and the document can't be approved until the code is agreed. To put the client's logo on the cover as well, give Claude the logo file (PNG or JPG) and ask for it on the cover.
+Every project gets its own details (name, code, client, version, author) on the cover, in the header and in the file name. Panasa's branding is the same everywhere. If the client hasn't agreed a project code yet, Claude uses a provisional one: the cover says so, and the document can't be approved until the code is agreed. There is no fixed logo: when Claude starts a document it asks whether you want logos on the cover. Upload your company's logo (shown on the cover and in the page header) and/or the client's logo (cover), as PNG or JPG, or skip it and the company name is shown instead. Updated versions keep the same logos.
 
 In the Word file, open items are highlighted: `TBD (owner: ...)` in yellow, and anything Claude suggested that no source states, marked `(Proposed)`, in turquoise. Both must be resolved before a document can be marked Approved.
 

@@ -26,9 +26,9 @@ from lxml import etree  # noqa: E402  (installed with python-docx)
 
 MONO_FONTS = {"Consolas", "Courier New"}
 LABEL_TO_KEY = dict(COVER_FIELDS)
-FRONT_KEYS = ("type", "title", "project", "project_code", "project_code_status", "client", "client_logo", "version",
-              "status", "date", "prepared_by", "reviewed_by", "approved_by", "approval_ref", "classification")
-OPTIONAL_KEYS = {"title", "client_logo", "approval_ref", "project_code_status"}
+FRONT_KEYS = ("type", "title", "project", "project_code", "project_code_status", "client", "logo", "client_logo",
+              "version", "status", "date", "prepared_by", "reviewed_by", "approved_by", "approval_ref", "classification")
+OPTIONAL_KEYS = {"title", "logo", "client_logo", "approval_ref", "project_code_status"}
 BULLET_STYLES = {"List Bullet": 0, "List Bullet 2": 1, "List Bullet 3": 2}
 NUMBER_STYLES = {"Numbered Item": 0, "Numbered Item 2": 1, "Numbered Item 3": 2}
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -125,10 +125,11 @@ def read_front(doc, items, img_dir):
             elif name == "Front Heading":
                 in_revisions = it.text.strip().lower() == "revision history"
             elif name == "Cover Brand":
-                rids = it._p.xpath('.//wp:inline[wp:docPr/@descr="client-logo"]//a:blip/@r:embed')
-                if rids:
-                    logo = save_image(doc, rids[0], img_dir, "client-logo")
-                    meta["client_logo"] = f"{img_dir.name}/{logo.name}"
+                for key, marker in (("logo", "brand-logo"), ("client_logo", "client-logo")):
+                    rids = it._p.xpath(f'.//wp:inline[wp:docPr/@descr="{marker}"]//a:blip/@r:embed')
+                    if rids:
+                        logo = save_image(doc, rids[0], img_dir, marker)
+                        meta[key] = f"{img_dir.name}/{logo.name}"
         elif in_revisions:
             revisions = [[c.text.strip().replace("\n", " ") for c in r.cells] for r in it.rows][1:]
             in_revisions = False
