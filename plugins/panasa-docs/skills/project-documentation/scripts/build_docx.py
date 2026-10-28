@@ -45,6 +45,7 @@ REQUIRED = ("type", "project", "project_code", "client", "version", "status", "d
 COVER_FIELDS = (
     ("Project", "project"),
     ("Project code", "project_code"),
+    ("Project code status", "project_code_status"),
     ("Client", "client"),
     ("Document type", "type_label"),
     ("Version", "version"),
@@ -58,6 +59,11 @@ COVER_FIELDS = (
 )
 IMAGE_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
 LOGO_TYPES = {".png", ".jpg", ".jpeg"}
+CODE_STATUSES = ("agreed", "provisional")
+# File names that usually hold credentials; reported at hand-over when found near the document, never opened.
+SECRET_FILES = re.compile(r"(?i)^(\.env(\..*)?|.*\.(pem|key|p12|pfx|jks|keystore)|google-services\.json|"
+                          r"GoogleService-Info\.plist|credentials.*\.json|id_rsa.*|id_ed25519.*)$")
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 # Values that don't name a real person or record.
 NOT_A_NAME = {"pending", "tbc", "tba", "n/a", "na", "-", "none", "client", "panasa", "yes", "approved", "signed", "unknown"}
 STANDARD_IDS = ("FR", "NFR", "OQ", "DEC", "RSK", "KI")
@@ -338,6 +344,11 @@ def check_meta(meta, revisions, src_dir, errors, warnings):
     code, version, status = meta.get("project_code", ""), meta.get("version", ""), meta.get("status", "")
     if code and not re.fullmatch(r"[A-Z][A-Z0-9]{1,11}", code):
         errors.append("project_code must be 2 to 12 capital letters or digits, starting with a letter (e.g. NIRVANA).")
+    code_status = meta.get("project_code_status", "").lower()
+    if code_status and code_status not in CODE_STATUSES:
+        errors.append(f"project_code_status must be 'agreed' or 'provisional' (found '{meta['project_code_status']}').")
+    if code_status == "provisional" and status == "Approved":
+        errors.append("An approved document needs an agreed project code; it is still marked provisional.")
     if version and not re.fullmatch(r"\d+\.\d+", version):
         errors.append(f"version must look like 0.1 or 1.0 (found '{version}').")
     if status and status not in STATUSES:
@@ -656,13 +667,35 @@ def report(src, meta, sections, errors, warnings, tbds, proposed, ticks, blank):
             print(f"    line {ln}: {short(text)}")
 
 
-def handover(meta, out, tbds, proposed, questions, ticks):
+def secret_files_near(src):
+    """Names of secret-bearing files in the source's folder (and, for a docs/ folder, the project folder above it)."""
+    roots = [src.parent] + ([src.parent.parent] if src.parent.name.lower() == "docs" else [])
+    found, seen = [], 0
+    for root in roots:
+        for path in root.rglob("*"):
+            if seen > 5000 or len(found) >= 20:
+                break
+            seen += 1
+            if SKIP_DIRS.intersection(path.relative_to(root).parts[:-1]) or not path.is_file():
+                continue
+            rel = path.relative_to(roots[-1]).as_posix()
+            if SECRET_FILES.match(path.name) and rel not in found:
+                found.append(rel)
+    return found
+
+
+def handover(meta, out, tbds, proposed, questions, ticks, secret_files):
     owners = {}
     for _, text in tbds:
         for owner in TBD_OWNER.findall(text):
             owners[owner.strip()] = owners.get(owner.strip(), 0) + 1
     print("HAND-OVER: your final message to the user must cover all of the following:")
     print(f"  - The file: {out.name} ({meta['type']} v{meta['version']}, {meta['status']})")
+    if meta.get("project_code_status", "").lower() == "provisional":
+        print(f"  - The project code {meta['project_code']} is provisional: it must be agreed before approval")
+    if secret_files:
+        print("  - Files that usually hold secrets are in the project folder (" + ", ".join(secret_files) + "). "
+              "Tell the user they should not be shared or committed and may need rotating; do not open them.")
     if owners:
         print("  - Open TBD items by owner: " + "; ".join(f"{o} ({n})" for o, n in owners.items()))
     else:
@@ -938,7 +971,12 @@ def add_cover(ctx, meta):
         pic._inline.docPr.set("descr", "client-logo")
     ctx.par("Title", meta["title"])
     ctx.par("Subtitle", meta["project"])
-    rows = [[label, meta.get(key, "")] for label, key in COVER_FIELDS if key != "approval_ref" or meta.get(key)]
+    shown = dict(meta)
+    if shown.get("project_code_status", "").lower() == "provisional":
+        shown["project_code_status"] = "Provisional: to be agreed with the client"
+    optional = ("approval_ref", "project_code_status")
+    rows = [[label, shown.get(key, "")] for label, key in COVER_FIELDS
+            if key not in optional or (meta.get(key) and not (key == "project_code_status" and meta[key].lower() == "agreed"))]
     add_table(ctx, rows, header=False, weights=[1, 2.6], label_col=True)
     notice = brand["confidentiality_notice"]
     for token, value in (("{classification}", meta["classification"]), ("{company}", brand["company"]),
@@ -985,7 +1023,8 @@ def build(meta, revisions, blocks, brand, src_dir, out_path, blank):
     if blank:
         doc_ref = f"{meta['type']} template"
     else:
-        doc_ref = f"{meta['project_code']} · {meta['type']} · v{meta['version']} · {meta['status']}"
+        provisional = " (provisional code)" if meta.get("project_code_status", "").lower() == "provisional" else ""
+        doc_ref = f"{meta['project_code']}{provisional} · {meta['type']} · v{meta['version']} · {meta['status']}"
     fill_tokens(doc, {"{{DOC_REF}}": doc_ref, "{{CLASSIFICATION}}": meta["classification"]})
 
     add_cover(ctx, meta)
@@ -1077,7 +1116,7 @@ def main():
         return 1
     print(f"Built: {out}")
     if not args.blank:
-        handover(meta, out, tbds, proposed, open_questions(blocks), ticks)
+        handover(meta, out, tbds, proposed, open_questions(blocks), ticks, secret_files_near(src))
     return 0
 
 

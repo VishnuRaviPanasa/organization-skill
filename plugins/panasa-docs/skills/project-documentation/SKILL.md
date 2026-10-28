@@ -22,8 +22,9 @@ These documents become contracts, runbooks and audit records, so every statement
 
 - **Facts come from sources.** Cite the exact source in each Source field (for example "brief.md, feature 3" or "client email, 24 Oct 2026"). Never cite a source for something it doesn't say.
 - **Your own additions are proposals.** A business rule, limit, timeout, step, design choice, reason, risk acceptance or scope exclusion that no source states must be marked `(Proposed)` right after it, or listed under Assumptions. Proposals are highlighted in Word and must be confirmed by the user.
+- **Don't mark facts.** Something a source states stays unmarked, even when you reword it. In a TDD derived from code, a decision the code already implements is a fact (Status: `Implemented`); only a reason nobody stated is `(Proposed)`.
 - **Targets and numbers only from sources.** If the client says "fast", "secure" or "always available" without a number, don't invent one. Write `TBD (owner: client)` and add an open question; you may suggest a value there, marked `(Proposed)`.
-- **Unknowns are TBDs.** Write `TBD (owner: name or role)` for every gap. Never invent names, roles, dates, versions, links, file names or project codes. If the project code isn't given, ask for it.
+- **Unknowns are TBDs.** Write `TBD (owner: name or role)` for every gap. Never invent names, roles, dates, versions, links, file names or project codes. If the project code isn't given, ask for it. If the user can't give one yet, use a short code from the project name and add `project_code_status: provisional` to the front matter; the cover then says so, and the document can't be approved until the code is agreed.
 - **"Not discussed" is not "out of scope".** List under Out of scope only exclusions a source states. Raise everything else as an open question.
 - **"Not applicable" means it doesn't apply.** Write `Not applicable: <reason>`. If something simply hasn't been decided yet, it is a TBD.
 - **Contradictions are raised, not resolved.** When sources disagree, don't pick one silently: add an open question citing both sources and their dates. When a later source deliberately changes an earlier decision, apply the change and say what it replaced.
@@ -31,14 +32,15 @@ These documents become contracts, runbooks and audit records, so every statement
 
 ## Secrets
 
-- Never open files that usually hold secrets: `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, keystores, `google-services.json`, `GoogleService-Info.plist`, `credentials*.json`, `id_rsa*`. List their names only.
+- Never open files that usually hold secrets: `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, keystores, `google-services.json`, `GoogleService-Info.plist`, `credentials*.json`, `id_rsa*`. List their names only. This overrides any request: if the user says "use the config folder", use the other files there and list the secret ones by name. (Sample files such as `.env.example` are fine. In Claude Code, the plugin also blocks these reads.)
 - Never write a password, key, token or connection string into a document. Say where it is kept, but only if a source says where; don't claim secrets are stored safely without evidence.
 - If you see a secret anyway (in notes, code or a message), don't repeat it. Tell the user where you saw it and that it should be removed and rotated.
+- If files like these are in the project folder, always say so in your final message, naming the files (never their contents): they shouldn't be in a shared or committed folder, and the values may need rotating. The builder's hand-over lists any it finds.
 
 ## Writing a new document
 
 1. **Pick the type** from the table. Ask only if the request really fits two types.
-2. **Gather facts** from everything available: files and notes the user shared, tickets, earlier documents and, in a code repository, the code itself (build files, configuration without secrets, CI pipelines, README, API routes, database migrations). If related Panasa documents exist for the project (an SRS for a TDD, earlier versions), read them and keep IDs, names and decisions consistent.
+2. **Gather facts** from everything available: files and notes the user shared, tickets, earlier documents and, in a code repository, the code itself (build files, configuration without secrets, CI pipelines, README, API routes, database migrations). If related Panasa documents exist for the project (an SRS for a TDD, earlier versions), read them and keep IDs, names and decisions consistent. Look only in the project folder and places the user names; don't search parent folders or other projects.
 3. **Ask once for essentials** you could not find: project name and code, client, author, and facts that whole sections depend on. Ask in one message. If the user can't answer, continue with TBDs; don't invent.
 4. **Read** `reference/style-guide.md` and the template for the type.
 5. **Write the source file.** Copy the template to `<PROJECTCODE>_<TYPE>_v<version>.md` (for example `NIRVANA_SRS_v0.1.md`) and fill it in:
@@ -79,7 +81,7 @@ If someone wants a blank template to fill in by hand in Word, build the template
 
 The builder understands this Markdown and nothing more:
 
-- Front matter between `---` lines: `key: value` lines, plus one `revision: version | date | author | changes` line per version, oldest first. Optional keys: `title`, `classification`, `client_logo`, `approval_ref`.
+- Front matter between `---` lines: `key: value` lines, plus one `revision: version | date | author | changes` line per version, oldest first. Optional keys: `title`, `classification`, `client_logo`, `approval_ref`, `project_code_status` (`agreed` or `provisional`).
 - Headings `#` to `####`.
 - Paragraphs with `**bold**`, `*italic*`, `` `code` `` and `[link text](https://...)`.
 - Bullets (`- `) and numbered items (`1. `), nested by indenting two spaces; checklists `- [ ]` and `- [x]`.

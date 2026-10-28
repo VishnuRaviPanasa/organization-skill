@@ -26,9 +26,9 @@ from lxml import etree  # noqa: E402  (installed with python-docx)
 
 MONO_FONTS = {"Consolas", "Courier New"}
 LABEL_TO_KEY = dict(COVER_FIELDS)
-FRONT_KEYS = ("type", "title", "project", "project_code", "client", "client_logo", "version", "status", "date",
-              "prepared_by", "reviewed_by", "approved_by", "approval_ref", "classification")
-OPTIONAL_KEYS = {"title", "client_logo", "approval_ref"}
+FRONT_KEYS = ("type", "title", "project", "project_code", "project_code_status", "client", "client_logo", "version",
+              "status", "date", "prepared_by", "reviewed_by", "approved_by", "approval_ref", "classification")
+OPTIONAL_KEYS = {"title", "client_logo", "approval_ref", "project_code_status"}
 BULLET_STYLES = {"List Bullet": 0, "List Bullet 2": 1, "List Bullet 3": 2}
 NUMBER_STYLES = {"Numbered Item": 0, "Numbered Item 2": 1, "Numbered Item 3": 2}
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -140,6 +140,8 @@ def read_front(doc, items, img_dir):
     m = re.search(r"\((\w+)\)\s*$", meta.pop("type_label", ""))
     if m:
         meta["type"] = m.group(1)
+    if meta.get("project_code_status", "").lower().startswith("provisional"):
+        meta["project_code_status"] = "provisional"
     if title and title != DOC_TYPES.get(meta.get("type"), ("",))[0]:
         meta["title"] = title
     return meta, [r for r in revisions if any(r)]

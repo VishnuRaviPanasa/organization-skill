@@ -12,6 +12,7 @@ reviewed_by: TBD
 approved_by: TBD
 classification: Confidential
 # Optional: client_logo: <logo file supplied by the client>   approval_ref: <where approval is recorded; only when Approved>
+# Optional: project_code_status: provisional   (only when the client hasn't agreed the project code yet)
 revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 ---
 

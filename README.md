@@ -15,7 +15,7 @@ Panasa's shared Claude skills. This repo is the single source for them: the Clau
 
 Claude picks the skill up whenever someone asks for project documentation, for example "Write an SRS for the Nirvana loans module from these workshop notes" or "Update the FieldPulse handover note for release 2.4". In Claude Code you can also run `/panasa-docs:project-documentation`.
 
-Every project gets its own details (name, code, client, version, author) on the cover, in the header and in the file name. Panasa's branding is the same everywhere. To put the client's logo on the cover as well, give Claude the logo file (PNG or JPG) and ask for it on the cover.
+Every project gets its own details (name, code, client, version, author) on the cover, in the header and in the file name. Panasa's branding is the same everywhere. If the client hasn't agreed a project code yet, Claude uses a provisional one: the cover says so, and the document can't be approved until the code is agreed. To put the client's logo on the cover as well, give Claude the logo file (PNG or JPG) and ask for it on the cover.
 
 In the Word file, open items are highlighted: `TBD (owner: ...)` in yellow, and anything Claude suggested that no source states, marked `(Proposed)`, in turquoise. Both must be resolved before a document can be marked Approved.
 
@@ -70,7 +70,7 @@ Every member gets the skill, switched on by default. To release an update, uploa
 
 ### Claude Code
 
-1. The repo is `github.com/VishnuRaviPanasa/organization-skill` (private). Every developer needs read access to it and must be able to clone it on their machine (signed in to GitHub through git), plus Python 3 with `pip install python-docx` (the Claude app runs the scripts in its own environment).
+1. The repo is `github.com/VishnuRaviPanasa/organization-skill` (public, so no access set-up is needed). Every developer needs Python 3 with `pip install python-docx` on their machine (the Claude app runs the scripts in its own environment). If the repo is made private later, every developer will also need read access and a GitHub sign-in through git.
 2. An Owner adds this to claude.ai → Organization settings → Claude Code → Managed settings:
 
    ```json
@@ -84,6 +84,12 @@ Every member gets the skill, switched on by default. To release an update, uploa
      "enabledPlugins": { "panasa-docs@panasa": true }
    }
    ```
+
+### Secret-file protection in Claude Code
+
+The plugin includes a hook (`plugins/panasa-docs/hooks/`) that stops Claude from opening files that usually hold secrets: `.env*`, private keys (`*.pem`, `*.key`), keystores, `google-services.json`, `credentials*.json` and SSH keys. It blocks the Read and Grep tools and shell commands that print those files. Listing their names is allowed, and so are sample files such as `.env.example`.
+
+The hook applies to **all** Claude Code work while the plugin is installed, not only documentation. That is deliberate Panasa policy. Developers who need Claude to read a real secrets file in a specific case must open it themselves. The hook needs Python 3; if Python isn't available, the hook does nothing.
 
 ### Try it locally first
 

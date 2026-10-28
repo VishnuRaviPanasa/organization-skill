@@ -12,6 +12,7 @@ reviewed_by: TBD
 approved_by: TBD
 classification: Confidential
 # Optional: client_logo: <logo file supplied by the client>   approval_ref: <where approval is recorded; only when Approved>
+# Optional: project_code_status: provisional   (only when the client hasn't agreed the project code yet)
 revision: 0.1 | <DD Mon YYYY> | <Author name> | First draft
 ---
 
@@ -123,11 +124,11 @@ This document describes the design of <project name>. It implements the requirem
 # 8. Key design decisions
 
 <!-- Decisions a newcomer would question. DEC IDs are never reused.
-Record options and reasons only as a source states them. For a decision you can only see in the code, write the options and reason as TBD (owner: tech lead), or mark your suggestion (Proposed). Status is "Confirmed by <name>, <date>" or "Proposed". -->
+Record options and reasons only as a source states them. For a decision you can only see in the code, write the options and reason as TBD (owner: tech lead), or mark your suggestion (Proposed). Status is "Confirmed by <name>, <date>", "Implemented" (the code already does it) or "Proposed". An implemented decision is a fact; only an unstated reason for it is Proposed. -->
 
 | ID | Decision | Options considered | Reason | Status | Date |
 |---|---|---|---|---|---|
-| DEC-001 | <Decision> | <Options from a source> | <Reason from a source> | <Confirmed by name, or Proposed> | <DD Mon YYYY> |
+| DEC-001 | <Decision> | <Options from a source> | <Reason from a source> | <Confirmed by name, Implemented, or Proposed> | <DD Mon YYYY> |
 
 # 9. Testing approach
 

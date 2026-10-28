@@ -1,0 +1,17 @@
+{
+  "description": "Panasa policy: never open files that usually hold secrets (.env, private keys, keystores, credential files)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block_secret_files.py\" 2>/dev/null || python \"${CLAUDE_PLUGIN_ROOT}/hooks/block_secret_files.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
